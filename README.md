@@ -33,6 +33,27 @@ Sem variáveis configuradas, o diretório e a lista de instituições permanecem
 
 Os indicadores da página inicial consultam contagens exatas de políticos, partidos, mandatos, instituições e fontes ao carregar a página. O botão **Atualizar** consulta os totais novamente; falhas são exibidas sem recorrer a números demonstrativos.
 
+## Próximas fases de dados
+
+As seções de notícias/acontecimentos, agenda, votações, gastos agregados, comparador e Justiça ainda usam conteúdo demonstrativo. Não devem ser interpretadas como registros oficiais.
+
+- **Acontecimentos e proposições:** consultar proposições na API Dados Abertos da Câmara e relacioná-las por identificador oficial; prever páginas de detalhe com ementa, tramitação, autores e fonte.
+- **Agenda:** avaliar os eventos oficiais da Câmara e relacioná-los por ID do evento; cada evento precisa de página de detalhe e data/local fornecidos pela fonte.
+- **Votações:** obter sessões, proposições e votos nominais na API da Câmara. Relacionar voto, deputado e votação por IDs oficiais; preservar explicitamente ausência, obstrução, abstenção e indisponibilidade, sem inferir posições.
+- **Gastos:** a API oferece despesas individuais por parlamentar. A futura integração deve armazenar ou consultar lançamento, categoria, data, fornecedor, comprovante e fonte, mantendo cota parlamentar separada de remuneração e de outros gastos; detalhar cada lançamento antes de agregar valores.
+- **Comparador:** substituir valores demonstrativos por campos verificáveis dos perfis e definir uma página de comparação que identifique origem e período de cada métrica; não comparar grandezas sem período ou definição compatíveis.
+- **Justiça:** os registros atuais são demonstrativos. Antes de integrar, selecionar fontes oficiais adequadas e identificar processos por seus números oficiais, com órgão, situação, atualização e links documentais; não associar pessoas apenas por semelhança de nome.
+
+As páginas de detalhe devem manter a origem e a data de consulta dos dados. Novas relações devem usar identificadores oficiais estáveis; não ampliar o esquema ou importar dados até confirmar a cobertura, os campos e a licença da fonte correspondente.
+
+Os perfis consultam a API da Câmara pela função `chamber-deputy-profile`, pois a API de origem não permite chamadas cross-origin diretas pelo navegador. A função é somente de leitura, valida ID e ano e acessa caminhos fixos da API oficial; a verificação JWT permanece habilitada. Para implantá-la no projeto configurado:
+
+```sh
+npx supabase functions deploy chamber-deputy-profile --project-ref gpguflvfeakkxsalqcbf
+```
+
+O deploy requer autenticação do Supabase CLI. A função não usa `service_role` nem grava no banco.
+
 ## Banco e segurança
 
 - Migrações versionadas ficam em `supabase/migrations/`.

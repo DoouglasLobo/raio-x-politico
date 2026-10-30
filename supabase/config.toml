@@ -1,0 +1,4 @@
+project_id = "gpguflvfeakkxsalqcbf"
+
+[functions.chamber-deputy-profile]
+verify_jwt = true

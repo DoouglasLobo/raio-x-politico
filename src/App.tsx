@@ -25,6 +25,7 @@ import {
 import { Link, NavLink, Route, Routes, useParams } from 'react-router-dom'
 import { supabase, supabaseConfigurationError } from './lib/supabase'
 import { useRemoteData } from './hooks/useRemoteData'
+import { PoliticianProfilePage } from './components/PoliticianProfilePage'
 import {
   getHomeStatistics,
   listInstitutions,
@@ -343,7 +344,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/politicos" element={<DirectoryPage />} />
-          <Route path="/politicos/:id" element={<ProfilePage />} />
+          <Route path="/politicos/:id" element={<OfficialProfileRoute />} />
           <Route path="/gastos" element={<SpendingPage />} />
           <Route path="/votacoes" element={<VotesPage />} />
           <Route path="/comparador" element={<ComparatorPage />} />
@@ -765,6 +766,12 @@ function DirectoryPage() {
       </div>
     </div>
   )
+}
+
+function OfficialProfileRoute() {
+  const { id } = useParams()
+  if (!id) return <ProfilePage />
+  return <PoliticianProfilePage key={id} slug={id} />
 }
 
 function ProfilePage() {

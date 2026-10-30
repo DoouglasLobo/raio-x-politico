@@ -1,11 +1,14 @@
 import { supabase } from '../lib/supabase'
 
 export type PoliticalMandate = {
+  id: string
   title: string
   district: string | null
   startDate: string | null
   endDate: string | null
   status: 'current' | 'ended' | 'unknown'
+  partyAcronym: string | null
+  partyName: string | null
   institutionName: string | null
   sourceUrl: string
   origin: string
@@ -14,6 +17,7 @@ export type PoliticalMandate = {
 
 export type Politician = {
   id: string
+  camaraId: number | null
   name: string
   slug: string
   state: string | null
@@ -89,13 +93,13 @@ export async function listPoliticians(): Promise<Politician[]> {
   const [politiciansResult, partiesResult, mandatesResult, institutionsResult] = await Promise.all([
     client
       .from('politicians')
-      .select('id, full_name, slug, state, party_id, origin, source_url, last_updated_at')
+      .select('id, camara_id, full_name, slug, state, party_id, origin, source_url, last_updated_at')
       .order('full_name'),
-    client.from('parties').select('id, acronym'),
+    client.from('parties').select('id, acronym, name'),
     client
       .from('mandates')
       .select(
-        'politician_id, institution_id, title, district, start_date, end_date, status, origin, source_url, last_updated_at',
+        'id, politician_id, institution_id, party_id, title, district, start_date, end_date, status, origin, source_url, last_updated_at',
       )
       .order('start_date', { ascending: false }),
     client.from('institutions').select('id, name'),
@@ -114,26 +118,30 @@ export async function listPoliticians(): Promise<Politician[]> {
     throw new Error(`Não foi possível carregar instituições dos mandatos: ${institutionsResult.error.message}`)
   }
 
-  const partiesById = new Map(partiesResult.data.map((party) => [party.id, party.acronym]))
+  const partiesById = new Map(partiesResult.data.map((party) => [party.id, party]))
   const institutionsById = new Map(institutionsResult.data.map((institution) => [institution.id, institution.name]))
 
   return politiciansResult.data.map((politician) => ({
     id: politician.id,
+    camaraId: politician.camara_id,
     name: politician.full_name,
     slug: politician.slug,
     state: politician.state,
-    partyAcronym: politician.party_id ? partiesById.get(politician.party_id) ?? null : null,
+    partyAcronym: politician.party_id ? partiesById.get(politician.party_id)?.acronym ?? null : null,
     origin: politician.origin,
     sourceUrl: politician.source_url,
     lastUpdatedAt: politician.last_updated_at,
     mandates: mandatesResult.data
       .filter((mandate) => mandate.politician_id === politician.id)
       .map((mandate) => ({
+        id: mandate.id,
         title: mandate.title,
         district: mandate.district,
         startDate: mandate.start_date,
         endDate: mandate.end_date,
         status: mandate.status,
+        partyAcronym: mandate.party_id ? partiesById.get(mandate.party_id)?.acronym ?? null : null,
+        partyName: mandate.party_id ? partiesById.get(mandate.party_id)?.name ?? null : null,
         institutionName: mandate.institution_id
           ? institutionsById.get(mandate.institution_id) ?? null
           : null,
@@ -142,6 +150,84 @@ export async function listPoliticians(): Promise<Politician[]> {
         lastUpdatedAt: mandate.last_updated_at,
       })),
   }))
+}
+
+export async function getPoliticianBySlug(slug: string): Promise<Politician[]> {
+  const client = getClient()
+  const { data: politician, error: politicianError } = await client
+    .from('politicians')
+    .select('id, camara_id, full_name, slug, state, party_id, origin, source_url, last_updated_at')
+    .eq('slug', slug)
+    .maybeSingle()
+
+  if (politicianError) {
+    throw new Error(`Não foi possível carregar o político: ${politicianError.message}`)
+  }
+  if (!politician) return []
+
+  const { data: mandates, error: mandatesError } = await client
+    .from('mandates')
+    .select('id, politician_id, institution_id, party_id, title, district, start_date, end_date, status, origin, source_url, last_updated_at')
+    .eq('politician_id', politician.id)
+    .order('start_date', { ascending: false, nullsFirst: false })
+
+  if (mandatesError) {
+    throw new Error(`Não foi possível carregar os mandatos: ${mandatesError.message}`)
+  }
+
+  const partyIds = [...new Set([politician.party_id, ...mandates.map((mandate) => mandate.party_id)].filter(
+    (id): id is string => id !== null,
+  ))]
+  const institutionIds = [...new Set(mandates.map((mandate) => mandate.institution_id).filter(
+    (id): id is string => id !== null,
+  ))]
+  const [partiesResult, institutionsResult] = await Promise.all([
+    partyIds.length > 0
+      ? client.from('parties').select('id, acronym, name').in('id', partyIds)
+      : Promise.resolve({ data: [], error: null }),
+    institutionIds.length > 0
+      ? client.from('institutions').select('id, name').in('id', institutionIds)
+      : Promise.resolve({ data: [], error: null }),
+  ])
+  if (partiesResult.error) {
+    throw new Error(`Não foi possível carregar os partidos do perfil: ${partiesResult.error.message}`)
+  }
+  if (institutionsResult.error) {
+    throw new Error(`Não foi possível carregar as instituições dos mandatos: ${institutionsResult.error.message}`)
+  }
+
+  const partiesById = new Map(partiesResult.data.map((party) => [party.id, party]))
+  const institutionsById = new Map(institutionsResult.data.map((institution) => [institution.id, institution.name]))
+  return [{
+    id: politician.id,
+    camaraId: politician.camara_id,
+    name: politician.full_name,
+    slug: politician.slug,
+    state: politician.state,
+    partyAcronym: politician.party_id ? partiesById.get(politician.party_id)?.acronym ?? null : null,
+    origin: politician.origin,
+    sourceUrl: politician.source_url,
+    lastUpdatedAt: politician.last_updated_at,
+    mandates: mandates.map((mandate) => {
+      const party = mandate.party_id ? partiesById.get(mandate.party_id) : null
+      return {
+        id: mandate.id,
+        title: mandate.title,
+        district: mandate.district,
+        startDate: mandate.start_date,
+        endDate: mandate.end_date,
+        status: mandate.status,
+        partyAcronym: party?.acronym ?? null,
+        partyName: party?.name ?? null,
+        institutionName: mandate.institution_id
+          ? institutionsById.get(mandate.institution_id) ?? null
+          : null,
+        sourceUrl: mandate.source_url,
+        origin: mandate.origin,
+        lastUpdatedAt: mandate.last_updated_at,
+      }
+    }),
+  }]
 }
 
 export async function listInstitutions(): Promise<Institution[]> {
