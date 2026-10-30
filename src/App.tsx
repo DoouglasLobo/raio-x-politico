@@ -6,9 +6,9 @@ import {
   FileText,
   Gavel,
   Landmark,
+  RefreshCw,
   Search,
   ShieldCheck,
-  TrendingUp,
   Users,
 } from 'lucide-react'
 import {
@@ -26,6 +26,7 @@ import { Link, NavLink, Route, Routes, useParams } from 'react-router-dom'
 import { supabase, supabaseConfigurationError } from './lib/supabase'
 import { useRemoteData } from './hooks/useRemoteData'
 import {
+  getHomeStatistics,
   listInstitutions,
   listPoliticians,
   type Institution,
@@ -225,13 +226,6 @@ const comparisonData = [
   { name: 'Votação', lula: 78, tebet: 74, dino: 84, tarcisio: 71 },
 ]
 
-const siteStats = [
-  { label: 'Políticos rastreados', value: '18.420', note: 'Cargos e mandatos nacionais e estaduais' },
-  { label: 'Votações monitoradas', value: '1.240', note: 'Projetos em comissões e plenário' },
-  { label: 'Indicadores de gasto', value: '640', note: 'Rubricas e categorias de desembolso' },
-  { label: 'Casos em análise', value: '312', note: 'Processos e decisões públicas catalogadas' },
-]
-
 const methodNotes = [
   'Dados de aplicação exemplificativa e estruturada para protótipo, com foco em apresentação e navegação.',
   'Cada card contém categoria, valor, fonte, período e referência de atualização para facilitar checagem.',
@@ -375,6 +369,7 @@ function App() {
 function HomePage() {
   const [query, setQuery] = useState('')
   const remote = useRemoteData(listPoliticians)
+  const statistics = useRemoteData(getHomeStatistics)
 
   const matches = remote.isConfigured
     ? remote.data.filter((person) =>
@@ -441,28 +436,72 @@ function HomePage() {
           </div>
 
           <div className="grid gap-3">
-            {siteStats.slice(0, 3).map((stat) => (
+            {statistics.isConfigured && !statistics.loading && !statistics.error && statistics.data.slice(0, 3).map((stat) => (
               <div key={stat.label} className="rounded-2xl border border-slate-700 bg-white/5 p-4">
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-300">{stat.label}</p>
-                <p className="mt-2 text-2xl font-bold text-white">{stat.value}</p>
+                <p className="mt-2 text-2xl font-bold text-white">{stat.value.toLocaleString('pt-BR')}</p>
                 <p className="mt-1 text-xs text-slate-300">{stat.note}</p>
               </div>
             ))}
+            {statistics.loading && (
+              <div className="rounded-2xl border border-slate-700 bg-white/5 p-4 text-sm text-slate-200" role="status">
+                Carregando indicadores reais...
+              </div>
+            )}
+            {statistics.configurationError && (
+              <div className="rounded-2xl border border-amber-300/40 bg-amber-100/10 p-4 text-sm text-amber-100" role="alert">
+                {statistics.configurationError}
+              </div>
+            )}
+            {statistics.error && (
+              <div className="rounded-2xl border border-red-300/40 bg-red-100/10 p-4 text-sm text-red-100" role="alert">
+                {statistics.error}
+              </div>
+            )}
+            {!statistics.isConfigured && !statistics.configurationError && (
+              <div className="rounded-2xl border border-amber-300/40 bg-amber-100/10 p-4 text-sm text-amber-100" role="status">
+                Configure o Supabase para carregar indicadores reais.
+              </div>
+            )}
           </div>
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {siteStats.map((stat) => (
-          <div key={stat.label} className="stat-card">
-            <p className="text-sm text-slate-500">{stat.label}</p>
-            <div className="mt-4 flex items-end justify-between gap-4">
-              <p className="text-3xl font-bold text-slate-900">{stat.value}</p>
-              <TrendingUp className="h-5 w-5 text-emerald-600" />
-            </div>
-            <p className="mt-2 text-xs text-slate-500">{stat.note}</p>
+      <section>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="text-xs text-slate-500">Totais consultados diretamente no banco de dados.</p>
+          {statistics.isConfigured && (
+            <button
+              type="button"
+              onClick={statistics.refresh}
+              disabled={statistics.loading}
+              className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-200 hover:text-slate-900 disabled:cursor-wait disabled:opacity-60"
+              aria-label="Atualizar indicadores"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${statistics.loading ? 'animate-spin' : ''}`} />
+              Atualizar
+            </button>
+          )}
+        </div>
+        {statistics.loading ? (
+          <div className="card p-5 text-sm text-slate-600" role="status">Carregando indicadores reais...</div>
+        ) : statistics.configurationError ? (
+          <DataMessage isError>{statistics.configurationError}</DataMessage>
+        ) : statistics.error ? (
+          <DataMessage isError>Não foi possível carregar os indicadores: {statistics.error}</DataMessage>
+        ) : !statistics.isConfigured ? (
+          <DataMessage>Configure o Supabase para carregar indicadores reais.</DataMessage>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            {statistics.data.map((stat) => (
+              <div key={stat.label} className="stat-card">
+                <p className="text-sm text-slate-500">{stat.label}</p>
+                <p className="mt-4 text-3xl font-bold text-slate-900">{stat.value.toLocaleString('pt-BR')}</p>
+                <p className="mt-2 text-xs text-slate-500">{stat.note}</p>
+              </div>
+            ))}
           </div>
-        ))}
+        )}
       </section>
 
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">

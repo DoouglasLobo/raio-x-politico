@@ -31,6 +31,8 @@ Aplicação React + TypeScript + Vite. A integração inicial com Supabase carre
 
 Sem variáveis configuradas, o diretório e a lista de instituições permanecem no modo de demonstração identificado. Com a configuração presente, erros de conexão são exibidos e tabelas vazias continuam vazias — os dados demonstrativos não são usados como fallback.
 
+Os indicadores da página inicial consultam contagens exatas de políticos, partidos, mandatos, instituições e fontes ao carregar a página. O botão **Atualizar** consulta os totais novamente; falhas são exibidas sem recorrer a números demonstrativos.
+
 ## Banco e segurança
 
 - Migrações versionadas ficam em `supabase/migrations/`.

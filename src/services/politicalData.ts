@@ -35,12 +35,53 @@ export type Institution = {
   lastUpdatedAt: string | null
 }
 
+export type HomeStatistic = {
+  label: string
+  value: number
+  note: string
+}
+
 function getClient() {
   if (!supabase) {
     throw new Error('Supabase não configurado. Preencha as variáveis em .env.local e reinicie o Vite.')
   }
 
   return supabase
+}
+
+export async function getHomeStatistics(): Promise<HomeStatistic[]> {
+  const client = getClient()
+  const [politicians, parties, mandates, institutions, sources] = await Promise.all([
+    client.from('politicians').select('id', { count: 'exact', head: true }),
+    client.from('parties').select('id', { count: 'exact', head: true }),
+    client.from('mandates').select('id', { count: 'exact', head: true }),
+    client.from('institutions').select('id', { count: 'exact', head: true }),
+    client.from('sources').select('id', { count: 'exact', head: true }),
+  ])
+
+  if (politicians.error) {
+    throw new Error(`Não foi possível contar políticos: ${politicians.error.message}`)
+  }
+  if (parties.error) {
+    throw new Error(`Não foi possível contar partidos: ${parties.error.message}`)
+  }
+  if (mandates.error) {
+    throw new Error(`Não foi possível contar mandatos: ${mandates.error.message}`)
+  }
+  if (institutions.error) {
+    throw new Error(`Não foi possível contar instituições: ${institutions.error.message}`)
+  }
+  if (sources.error) {
+    throw new Error(`Não foi possível contar fontes: ${sources.error.message}`)
+  }
+
+  return [
+    { label: 'Políticos cadastrados', value: politicians.count ?? 0, note: 'Total de registros na base' },
+    { label: 'Partidos cadastrados', value: parties.count ?? 0, note: 'Total de registros na base' },
+    { label: 'Mandatos cadastrados', value: mandates.count ?? 0, note: 'Inclui todos os status' },
+    { label: 'Instituições cadastradas', value: institutions.count ?? 0, note: 'Total de registros na base' },
+    { label: 'Fontes cadastradas', value: sources.count ?? 0, note: 'Total de registros na base' },
+  ]
 }
 
 export async function listPoliticians(): Promise<Politician[]> {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase, supabaseConfigurationError } from '../lib/supabase'
 
 type RemoteDataState<T> = {
@@ -8,6 +8,7 @@ type RemoteDataState<T> = {
 }
 
 export function useRemoteData<T>(load: () => Promise<T[]>) {
+  const [refreshVersion, setRefreshVersion] = useState(0)
   const [state, setState] = useState<RemoteDataState<T>>({
     data: [],
     loading: Boolean(supabase),
@@ -32,10 +33,16 @@ export function useRemoteData<T>(load: () => Promise<T[]>) {
     return () => {
       active = false
     }
-  }, [load])
+  }, [load, refreshVersion])
+
+  const refresh = useCallback(() => {
+    setState((previous) => ({ ...previous, loading: true, error: null }))
+    setRefreshVersion((version) => version + 1)
+  }, [])
 
   return {
     ...state,
+    refresh,
     isConfigured: Boolean(supabase),
     configurationError: supabaseConfigurationError,
   }
